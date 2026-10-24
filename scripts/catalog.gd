@@ -24,7 +24,7 @@ const MAPS := [
 	{
 		"id": "kiln",
 		"abyss": "dark",
-		"name": "Kiln",
+		"name": "Ventura",
 		"blurb": "Vents pop you off the broken slabs.",
 		"minutes": 2.5,
 		"seed": 23,
@@ -40,7 +40,7 @@ const MAPS := [
 	{
 		"id": "culvert",
 		"abyss": "bright",
-		"name": "Culvert",
+		"name": "Ducton",
 		"blurb": "Side jets shove you through the ducts.",
 		"minutes": 2.5,
 		"seed": 37,
@@ -56,7 +56,7 @@ const MAPS := [
 	{
 		"id": "highline",
 		"abyss": "bright",
-		"name": "Highline",
+		"name": "Guston",
 		"blurb": "A windmill turns over the jumps.",
 		"minutes": 2.5,
 		"seed": 41,
@@ -72,7 +72,7 @@ const MAPS := [
 	{
 		"id": "switchback",
 		"abyss": "dark",
-		"name": "Switchback",
+		"name": "Sawton",
 		"blurb": "Saws cross the alley between kicks.",
 		"minutes": 2.5,
 		"seed": 53,
@@ -88,7 +88,7 @@ const MAPS := [
 	{
 		"id": "overpass",
 		"abyss": "bright",
-		"name": "Overpass",
+		"name": "Haulifax",
 		"blurb": "Trucks cross the long road.",
 		"minutes": 2.5,
 		"seed": 67,
@@ -104,7 +104,7 @@ const MAPS := [
 	{
 		"id": "gallery",
 		"abyss": "bright",
-		"name": "Gallery",
+		"name": "Crumpton",
 		"blurb": "The plaster gives way, then bumper bags.",
 		"minutes": 2.5,
 		"seed": 71,
@@ -120,7 +120,7 @@ const MAPS := [
 	{
 		"id": "spire",
 		"abyss": "dark",
-		"name": "Spire",
+		"name": "Steepleton",
 		"blurb": "Gusts hit you on the way up the tower.",
 		"minutes": 2.5,
 		"seed": 83,
@@ -136,7 +136,7 @@ const MAPS := [
 	{
 		"id": "canal",
 		"abyss": "dark",
-		"name": "Canal",
+		"name": "Iceford",
 		"blurb": "The current drags the ice toward the edge.",
 		"minutes": 2.5,
 		"seed": 97,
@@ -152,7 +152,7 @@ const MAPS := [
 	{
 		"id": "market",
 		"abyss": "dark",
-		"name": "Night Market",
+		"name": "Signapore",
 		"blurb": "Swing signs in the dark. Slide under them.",
 		"minutes": 2.5,
 		"seed": 101,

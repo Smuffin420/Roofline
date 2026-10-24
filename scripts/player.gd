@@ -8,7 +8,7 @@ const AIR_ACCEL := 14.0
 const GRAVITY := 28.0
 const JUMP_V := 7.7
 const WALL_JUMP_V := 13.6
-const FALL_DEPTH := 16.0
+const FALL_DEPTH := 30.0
 const WALL_KICK := 7.6
 const STAND_H := 1.72
 const SLIDE_H := 0.9
@@ -85,6 +85,10 @@ var bot_lane_time := 0.0
 var bot_jump_wait := 0.0
 var bot_gap_set := false
 var bot_gap_late := false
+var bot_transfer_time := 0.0
+var bot_transfer_x := 0.0
+var finish_spot := Vector3.ZERO
+var finish_spotted := false
 var _bot_rng := RandomNumberGenerator.new()
 var suppress_jump := false
 var _step_wait := 0.0
@@ -280,13 +284,14 @@ func reach_finish() -> void:
 		return
 	finished = true
 	# Count the pass here. The body keeps running so it clears the posts.
-	glide_left = 4.0
+	glide_left = 2.6
 	_drop_body_block()
 	message = "Finished  %s" % format_time()
 	message_time = 99.0
 	if view_player:
 		Sfx.play("finish", -2.0)
 	_report_finish()
+	_claim_finish_spot()
 
 
 func _drop_body_block() -> void:
@@ -295,21 +300,56 @@ func _drop_body_block() -> void:
 	collision_mask = 1
 
 
+func _claim_finish_spot() -> void:
+	var index := 0
+	var race := get_tree().get_first_node_in_group("race")
+	if race != null and "finishes" in race:
+		var rows: Array = race.finishes
+		for i in rows.size():
+			var row: Dictionary = rows[i]
+			if str(row.get("id", "")) == str(name):
+				index = i
+				break
+	var course := get_tree().get_first_node_in_group("course")
+	if course != null and course.has_method("finish_spot"):
+		finish_spot = course.finish_spot(index)
+		finish_spotted = true
+
+
 func _glide_finish(delta: float) -> void:
 	_leave_wall()
 	sliding = false
 	rotation.y = lerp_angle(rotation.y, 0.0, 1.0 - exp(-10.0 * delta))
 	yaw = rotation.y
-	velocity.x = move_toward(velocity.x, 0.0, 24.0 * delta)
-	velocity.z = -9.0
-	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
-	glide_left -= 9.0 * delta
-	if glide_left <= 0.0:
-		glide_left = 0.0
-		velocity.x = 0.0
-		velocity.z = 0.0
-		_open_finish_view()
+	if not finish_spotted:
+		velocity.x = move_toward(velocity.x, 0.0, 24.0 * delta)
+		velocity.z = -9.0
+		if not is_on_floor():
+			velocity.y -= GRAVITY * delta
+		glide_left -= 9.0 * delta
+		if glide_left <= 0.0:
+			glide_left = 0.0
+			velocity.x = 0.0
+			velocity.z = 0.0
+			_open_finish_view()
+		return
+	var to := finish_spot - global_position
+	to.y = 0.0
+	if to.length() > 0.42 and glide_left > 0.0:
+		var speed := minf(8.5, maxf(3.2, to.length() * 2.4))
+		var step := to.normalized() * speed
+		velocity.x = step.x
+		velocity.z = step.z
+		if not is_on_floor():
+			velocity.y -= GRAVITY * delta
+		glide_left -= delta
+		return
+	glide_left = 0.0
+	velocity.x = 0.0
+	velocity.z = 0.0
+	global_position.x = finish_spot.x
+	global_position.z = finish_spot.z
+	_open_finish_view()
 
 
 func _open_finish_view() -> void:
@@ -979,8 +1019,14 @@ func _physics_process(delta: float) -> void:
 
 	if jump_buffer > 0.0 and stunned <= 0.0 and not finished:
 		if wall_running:
-			velocity += wall_normal * WALL_KICK
+			var kick_n := wall_normal
+			velocity += kick_n * WALL_KICK
 			velocity.y = WALL_JUMP_V
+			if _bot() and bot_transfer_time > 0.0:
+				var along := clampf(-velocity.z, 6.2, 8.0)
+				velocity.x = kick_n.x * 9.6
+				velocity.z = -along
+				bot_transfer_x = global_position.x + kick_n.x * 3.15
 			_leave_wall()
 			jump_buffer = 0.0
 			coyote = 0.0
@@ -1039,7 +1085,7 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 		elif not finished and not eliminated:
 			_respawn()
-	elif _bot() and not finished and not eliminated and global_position.y < checkpoint_pos.y - 8.0:
+	elif _bot() and not finished and not eliminated and global_position.y < checkpoint_pos.y - 30.0:
 		_respawn()
 
 	if lift > 0.0:
@@ -1284,20 +1330,18 @@ func ring() -> void:
 		return
 	if boost_lock > 0.0 and boost_time <= 0.0:
 		return
-	fov_kick = 4.0
+	fov_kick = 8.0
 	_clear_hang()
-	# A little extra down the roof. The jump's height stays whatever it already was.
-	if velocity.z > -13.5:
-		velocity.z = minf(velocity.z - 5.0, -13.5)
-	velocity.x = move_toward(velocity.x, 0.0, 1.6)
-	if not boost_back and boost_time < 0.26:
-		boost_time = 0.26
-		boost_back = false
-		boost_speed = maxf(boost_speed, 13.5)
-	boost_lock = maxf(boost_lock, 0.3)
+	velocity.z = minf(velocity.z - 8.0, -19.0)
+	velocity.y = maxf(velocity.y + 3.6, 6.4)
+	velocity.x = move_toward(velocity.x, 0.0, 2.4)
+	boost_time = 0.5
+	boost_back = false
+	boost_speed = maxf(boost_speed, 19.0)
+	boost_lock = maxf(boost_lock, 0.42)
 	message = "Ring"
 	message_time = 0.45
-	_sfx("boost", -6.0, 1.35, 0.14)
+	_sfx("boost", -3.0, 1.15, 0.2)
 
 
 func boost_along() -> void:
@@ -2153,7 +2197,7 @@ func _seat_busy(spot: Vector3) -> bool:
 func _bot_recover(delta: float) -> void:
 	if Match.battle or finished or eliminated or not Match.started:
 		return
-	if is_on_floor() and global_position.y < checkpoint_pos.y - 3.4:
+	if is_on_floor() and global_position.y < checkpoint_pos.y - 24.0:
 		_respawn()
 		return
 	if not bot_marked:
@@ -2268,6 +2312,14 @@ func _hazard_side() -> int:
 
 func _bot_wish(delta: float) -> Vector3:
 	_bot_prepare()
+	if bot_transfer_time > 0.0:
+		bot_transfer_time = maxf(0.0, bot_transfer_time - delta)
+		if wall_running or is_on_floor():
+			bot_transfer_time = 0.0
+		else:
+			var hop := Vector3(bot_transfer_x - global_position.x, 0, -1)
+			if hop.length() > 0.05:
+				return hop.normalized()
 	var wire := _zip_line()
 	var target_x := global_position.x
 	if wire < 900.0:
@@ -2307,17 +2359,16 @@ func _hole_at(dist: float) -> bool:
 
 
 func _floor_sample(x_off: float, z_off: float) -> float:
-	# Stay under the slide duct (its soffit is about 1.1) so the ray does not start inside that bar.
-	# 13.5m reaches drop landings 4.5–6m down, and a true pit still reads as empty.
+	# 28m reaches a long drop. A true pit still reads as empty.
 	pit_ray.position = Vector3(x_off, 0.95, z_off)
-	pit_ray.target_position = Vector3(0, -22.0, 0)
+	pit_ray.target_position = Vector3(0, -30.0, 0)
 	pit_ray.force_raycast_update()
 	if not pit_ray.is_colliding():
 		return -999.0
 	if pit_ray.get_collision_normal().y <= 0.45:
 		return -999.0
 	var hit_y := pit_ray.get_collision_point().y
-	if hit_y > global_position.y + 1.8 or hit_y < global_position.y - 20.0:
+	if hit_y > global_position.y + 1.8 or hit_y < global_position.y - 28.0:
 		return -999.0
 	return hit_y
 
@@ -2328,7 +2379,7 @@ func _floor_at(x_off: float, z_off: float) -> bool:
 
 func _bot_target_x(delta: float) -> float:
 	var hits: Array[Dictionary] = []
-	for offset in [-6.4, -4.6, -3.0, -1.6, -0.55, 0.45, 1.5, 2.9, 4.5, 6.3]:
+	for offset in [-8.2, -6.4, -4.6, -3.0, -1.6, -0.55, 0.45, 1.5, 2.9, 4.5, 6.3, 8.0]:
 		var x_off := float(offset) + (bot_style - 0.5) * 0.28
 		var near := _floor_sample(x_off, -2.4)
 		var mid := _floor_sample(x_off, -5.8)
@@ -2553,6 +2604,38 @@ func _rise_ahead() -> bool:
 	return point.y > global_position.y + 0.45
 
 
+func _bot_commit_bounce() -> bool:
+	# Leave while the next wall is still ahead. A late kick runs past the overlap.
+	var ahead := _bot_wall_at(3.3)
+	var beside := _bot_wall_at(0.35)
+	var soon := _bot_wall_at(2.0)
+	if (ahead and not beside) or (beside and soon):
+		bot_transfer_time = 0.75
+		bot_transfer_x = global_position.x + wall_normal.x * 3.15
+		return true
+	return false
+
+
+func _bot_wall_at(ahead: float) -> bool:
+	if wall_side == 0:
+		return false
+	var side := -wall_side
+	var ray: RayCast3D = sense_l if side < 0 else sense_r
+	var saved_pos := ray.position
+	var saved_to := ray.target_position
+	ray.position = Vector3(0.0, 1.05, -ahead)
+	ray.target_position = Vector3(float(side) * 6.2, 0.0, 0.0)
+	ray.force_raycast_update()
+	var hit := false
+	if ray.is_colliding():
+		var normal: Vector3 = ray.get_collision_normal()
+		var into := Vector3(float(-side), 0.0, 0.0)
+		hit = absf(normal.y) < 0.35 and normal.dot(into) > 0.45
+	ray.position = saved_pos
+	ray.target_position = saved_to
+	return hit
+
+
 func _bot_wants_jump(delta: float) -> bool:
 	if zipping or hanging:
 		return false
@@ -2566,15 +2649,9 @@ func _bot_wants_jump(delta: float) -> bool:
 	if wall_running and wall_time > 0.18 and _rise_ahead():
 		bot_jump_wait = 0.0
 		return true
-	if wall_running and wall_time > 0.28:
+	if wall_running and wall_time > 0.2 and _bot_commit_bounce():
 		bot_jump_wait = 0.0
-		var other: RayCast3D = sense_r if wall_side < 0 else sense_l
-		other.force_raycast_update()
-		if other.is_colliding():
-			var normal: Vector3 = other.get_collision_normal()
-			if absf(normal.y) < 0.4 and normal.dot(wall_normal) < 0.15:
-				return true
-		return false
+		return true
 	if is_on_floor() and horizontal_speed() > 2.4 and _blocked_ahead() and not _bot_wants_slide():
 		bot_jump_wait = 0.0
 		return true

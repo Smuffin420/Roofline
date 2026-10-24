@@ -1561,12 +1561,12 @@ func _ghost_branch(node: Node, alpha: float) -> void:
 		return
 	for child in node.get_children():
 		if child is MeshInstance3D:
-		var mesh := child as MeshInstance3D
-		var base := tint
-		if mesh.material_override is StandardMaterial3D:
-			base = (mesh.material_override as StandardMaterial3D).albedo_color
-		mesh.material_override = _ghost_mat(base, alpha)
-		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var mesh := child as MeshInstance3D
+			var base := tint
+			if mesh.material_override is StandardMaterial3D:
+				base = (mesh.material_override as StandardMaterial3D).albedo_color
+			mesh.material_override = _ghost_mat(base, alpha)
+			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_ghost_branch(child, alpha)
 
 

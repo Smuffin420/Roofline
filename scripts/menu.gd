@@ -81,7 +81,7 @@ func _ready() -> void:
 
 	left.add_child(_label("THREE ROUNDS  ·  ONE TROPHY", 16, Color("e23b2f")))
 	left.add_child(_label("ROOFLINE", 48, Color("1c1915")))
-	left.add_child(_label(str(ProjectSettings.get_setting("application/config/version", "0.3.10")), 16, Color("5c564e")))
+	left.add_child(_label(str(ProjectSettings.get_setting("application/config/version", "0.3.15")), 16, Color("5c564e")))
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	_run_tab = _button("Run", func() -> void: _show_tab("run"))

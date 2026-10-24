@@ -473,6 +473,7 @@ func _apply_style(id: String) -> void:
 	_hop_base = _hop
 	_slide_lo_base = _slide_lo
 	_slide_hi_base = _slide_hi
+	_lane_half = maxf(4.6, _lane_half * 1.65)
 
 
 func _style(id: String) -> Dictionary:
@@ -623,9 +624,9 @@ func _journey(id: String) -> Array:
 	match id:
 		"annex":
 			return _lines([
-				"straight slide belt button gap teeth straight",
-				"zip straight wall gap wall straight",
-				"chain straight boost chain straight chain straight chain straight",
+				"straight slide belt button gap teeth split",
+				"zip straight wall gap wall drop",
+				"chain straight boost chain plunge chain straight chain",
 				"wall straight chain straight wall bumper straight",
 				"spring rise belt button teeth gap spring straight straight",
 			])
@@ -853,7 +854,7 @@ func _segment(kind: String) -> void:
 
 
 func _half() -> float:
-	return 3.4 if not _narrow else _lane_half
+	return 6.2 if not _narrow else _lane_half
 
 
 func _funnel() -> void:
@@ -887,6 +888,8 @@ func _straight(length: float) -> void:
 	travel += length
 	_since_cp += length
 	_min_floor = minf(_min_floor, _floor_y)
+	if length >= 18.0:
+		_routes(far, near)
 	if not _narrow and length >= 16.0 and _rng.randf() < 0.4:
 		_back_pad(near - length * 0.55)
 	if _since_cp > _cp_span:
@@ -944,54 +947,89 @@ func _deck(length: float, half: float, skin: String = "") -> void:
 
 
 func _landing() -> void:
-	_deck(_landing_len, 2.7)
+	_deck(_landing_len, _lane_half)
 	_mark_checkpoint()
 
 
+func _routes(far: float, near: float) -> void:
+	# Same stretch of roof, two extra choices. The high shoulder has no pads.
+	# The low lane is a longer drop with shoves, and a fan brings you back up.
+	if near - far < 16.0:
+		return
+	var side := 1.0 if _rng.randf() < 0.5 else -1.0
+	var y := _floor_y
+	var z_enter := near - 2.2
+	var z_leave := far + 2.4
+	var inner := side * (_lane_half - 0.15)
+	var outer := side * (_lane_half + 3.15)
+	_slab(minf(inner, outer), maxf(inner, outer), z_leave + 3.5, z_enter, y + 2.2, _concrete)
+	_slab(minf(0.0, outer), maxf(0.0, outer), z_leave, z_leave + 4.2, y, _dark)
+	var low_side := -side
+	var lx := low_side * (_lane_half + 2.15)
+	var low_y := y - 6.8
+	_slab(lx - 1.7, lx + 1.7, z_leave + 1.2, z_enter - 1.5, low_y, _dark)
+	_shove_at(lerpf(z_enter, z_leave, 0.38), lx, low_y)
+	_shove_at(lerpf(z_enter, z_leave, 0.68), lx - low_side * 0.45, low_y)
+	_fan_column(z_leave + 2.6, low_y - 0.2, y + 1.4, lx)
+	_slab(minf(0.0, lx), maxf(0.0, lx), z_leave, z_leave + 4.6, y, _concrete)
+
+
 func _gap() -> void:
-	var span := _rng.randf_range(3.7, 4.2) * _gap_scale
+	var span := _rng.randf_range(4.8, 6.1)
 	var lip := _solid_end
 	_hint("JUMP", Vector3(0, _floor_y + 2.3, lip - 1.2))
 	_solid_end -= span
 	travel += span
-	if span >= 4.9:
-		_jump_ring(0.0, lip - span * 0.46, _floor_y + 1.12)
-	elif span >= 4.25 and _rng.randf() < 0.55:
-		_jump_ring(0.0, lip - span * 0.46, _floor_y + 1.12)
+	var side := -1.0 if _rng.randf() < 0.5 else 1.0
+	var x := side * (_lane_half + 0.35)
+	var mid := lip - span * 0.5
+	_slab(x - 1.2, x + 1.2, mid - 0.85, mid + 0.85, _floor_y, _dark)
+	if span >= 5.2:
+		_jump_ring(0.0, lip - span * 0.46, _floor_y + 3.2)
 	_landing()
 
 
 func _slide() -> void:
 	var length := _rng.randf_range(_slide_lo, _slide_hi)
 	var near_z := _solid_end
-	_hint("SLIDE", Vector3(0, _floor_y + 2.5, near_z - 1.0))
-	_deck(length, 1.7, "duct")
+	var low_y := _floor_y
+	_hint("SLIDE", Vector3(0, low_y + 2.5, near_z - 1.0))
+	_deck(length, 2.55)
 	var far_z := _solid_end
-	var center_z := (near_z + far_z) * 0.5
 	var depth := absf(near_z - far_z)
-	var dressed := _kit_on()
-	_box(Vector3(-2.15, _floor_y + 1.45, center_z), Vector3(0.55, 2.9, depth), _metal, false, 0.0, "", dressed)
-	_box(Vector3(2.15, _floor_y + 1.45, center_z), Vector3(0.55, 2.9, depth), _metal, false, 0.0, "", dressed)
-	_box(Vector3(0, _floor_y + 1.28, center_z), Vector3(3.7, 0.36, depth), _hazard, false, 0.0, "roof", dressed)
-	_slide_lip(near_z)
-	# Small floor pads. They shove you forward with no lift, and they sit off center.
-	var side := -1.0 if _rng.randf() < 0.5 else 1.0
-	_shove_at(lerpf(near_z, far_z, 0.38), side * 0.7, _floor_y)
-	if depth > 12.0:
-		_shove_at(lerpf(near_z, far_z, 0.7), -side * 0.62, _floor_y)
+	var mouth := near_z - 2.6
+	# Low slats force the slide. They are too low to stand on.
+	var slat_z := mouth
+	while slat_z > far_z + 1.4:
+		var slat_far := maxf(far_z + 0.4, slat_z - 3.4)
+		_box(Vector3(0, low_y + 1.18, (slat_z + slat_far) * 0.5), Vector3(3.3, 0.18, absf(slat_z - slat_far)), _hazard)
+		slat_z = slat_far - 1.6
+	# Side floors you can climb onto. No pads up there.
+	var high := low_y + 1.62
+	var sides: Array[float] = [-1.0, 1.0]
+	for side in sides:
+		var x0 := float(side) * 1.9
+		var x1 := float(side) * 4.7
+		_slab(minf(x0, x1), maxf(x0, x1), far_z + 1.6, near_z, high, _concrete)
+		_slide_lip_at(float(side) * 2.05, high, near_z - 0.15)
+	var pads := 4 if depth > 14.0 else 3
+	for i in pads:
+		var t := (float(i) + 1.0) / (float(pads) + 1.0)
+		var x := 0.85 if i % 2 == 0 else -0.7
+		if i % 3 == 2:
+			x = -x
+		_shove_at(lerpf(near_z, far_z, t), x, low_y)
 	_landing()
 
 
-func _slide_lip(near_z: float) -> void:
-	# Hands can catch this. The body cannot, so the slide underneath stays open.
+func _slide_lip_at(x: float, y: float, z: float) -> void:
 	var lip := StaticBody3D.new()
 	lip.collision_layer = 4
 	lip.collision_mask = 0
-	lip.add_to_group("roof")
-	lip.position = Vector3(0.0, _floor_y + 1.09, near_z - 0.08)
+	lip.position = Vector3(x, y - 0.35, z)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(3.2, 0.74, 0.28)
+	box.size = Vector3(0.28, 0.7, 1.4)
 	shape.shape = box
 	lip.add_child(shape)
 	add_child(lip)
@@ -1026,7 +1064,7 @@ func _wall() -> void:
 func _bounce() -> void:
 	var hops := _hops
 	var hop := _hop
-	var overlap := 2.8
+	var overlap := 4.6
 	var start := _solid_end
 	_hint("BOUNCE", Vector3(0, _floor_y + 2.4, start + 2.0))
 	var z_cursor := start + 1.4
@@ -1116,7 +1154,7 @@ func _canyon() -> void:
 	var drop := 16.5
 	var lip := _solid_end
 	_hint("SEND IT", Vector3(0, _floor_y + 2.8, lip - 1.4))
-	_jump_ring(0.0, lip - span * 0.28, _floor_y + 1.2)
+	_jump_ring(0.0, lip - span * 0.28, _floor_y + 3.2)
 	_solid_end -= span
 	travel += span
 	_floor_y -= drop
@@ -1262,15 +1300,21 @@ func _drop() -> void:
 		_gap()
 		return
 	_drops += 1
-	var span := _rng.randf_range(3.9, 4.3)
+	var span := _rng.randf_range(4.6, 5.6)
+	var drop := _rng.randf_range(10.0, 14.0)
 	var lip := _solid_end
+	var high := _floor_y
 	_hint("DROP", Vector3(0, _floor_y + 2.2, _solid_end - 1.0))
-	if _rng.randf() < 0.55:
-		_jump_ring(0.0, lip - span * 0.42, _floor_y + 1.05)
 	_solid_end -= span
 	travel += span
-	_floor_y -= _rng.randf_range(5.2, 7.4)
+	_floor_y -= drop
 	_landing()
+	var side := -1.0 if _rng.randf() < 0.5 else 1.0
+	var x := side * (_lane_half + 1.35)
+	var land_far := _solid_end
+	_slab(x - 1.35, x + 1.35, land_far + 5.5, lip + 0.3, high, _concrete)
+	_slab(minf(0.0, x), maxf(0.0, x), land_far + 1.5, land_far + 6.0, _floor_y, _dark)
+	_shove_at(lip - span - 2.4, 0.0, _floor_y)
 
 
 func _rise() -> void:
@@ -1334,11 +1378,12 @@ func _plunge() -> void:
 		_gap()
 		return
 	_plunges += 1
-	var span := _rng.randf_range(7.4, 8.3)
-	var drop := _rng.randf_range(8.2, 10.4)
+	var span := _rng.randf_range(8.4, 10.6)
+	var drop := _rng.randf_range(14.0, 20.0)
 	var lip := _solid_end
+	var high := _floor_y
 	_hint("DOWN", Vector3(0, _floor_y + 2.6, lip - 1.5))
-	_jump_ring(0.0, lip - span * 0.4, _floor_y + 1.15)
+	_jump_ring(0.0, lip - span * 0.4, _floor_y + 3.2)
 	_dress(Vector3(0, _floor_y + 0.04, lip - 0.35), Vector3(5.4, 0.05, 0.16), _hazard)
 	_solid_end -= span
 	travel += span
@@ -1346,13 +1391,19 @@ func _plunge() -> void:
 	var near := _solid_end
 	var length := 13.0
 	var far := near - length
-	_slab(-3.2, 3.2, far, near, _floor_y, _dark)
+	_slab(-4.2, 4.2, far, near, _floor_y, _dark)
 	var pier_h := drop + 6.0
 	_dress(Vector3(0, _floor_y - pier_h * 0.42, (near + far) * 0.5), Vector3(1.8, pier_h * 0.84, 1.8), _metal)
 	_solid_end = far
 	travel += length
 	_since_cp += span + length
 	_min_floor = minf(_min_floor, _floor_y)
+	var side := -1.0 if _rng.randf() < 0.5 else 1.0
+	var shelf_x := side * (_lane_half + 1.2)
+	var shelf_y := high - 5.2
+	_slab(shelf_x - 1.45, shelf_x + 1.45, near + 1.5, lip - 1.2, shelf_y, _concrete)
+	_slab(minf(0.0, shelf_x), maxf(0.0, shelf_x), near - 1.0, near + 2.2, _floor_y, _dark)
+	_shove_at(near - 3.5, 0.0, _floor_y)
 	_mark_checkpoint()
 
 
@@ -1360,7 +1411,7 @@ func _teeth() -> void:
 	_hint("DON'T FALL", Vector3(0, _floor_y + 2.4, _solid_end - 1.0))
 	var count := _rng.randi_range(_teeth_lo, _teeth_hi)
 	for i in count:
-		var gap := _rng.randf_range(2.7, 3.45)
+		var gap := _rng.randf_range(3.15, 3.9)
 		_solid_end -= gap
 		travel += gap
 		var length := _rng.randf_range(4.4, 6.2)
@@ -1946,11 +1997,11 @@ func _fan() -> void:
 	_landing()
 
 
-func _fan_column(z: float, y0: float, y1: float) -> void:
+func _fan_column(z: float, y0: float, y1: float, x: float = 0.0) -> void:
 	var height := maxf(2.0, y1 - y0)
 	var area := Area3D.new()
 	area.set_script(load("res://scripts/fan.gd"))
-	area.position = Vector3(0, (y0 + y1) * 0.5, z)
+	area.position = Vector3(x, (y0 + y1) * 0.5, z)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(3.4, height, 3.4)
@@ -2072,7 +2123,7 @@ func _spring_mandatory() -> void:
 	var lip := _solid_end
 	_spring_pad(0.0, lip + 3.4, _floor_y, true)
 	if _rng.randf() < 0.5:
-		_jump_ring(0.0, lip - 5.0, _floor_y + 3.6)
+		_jump_ring(0.0, lip - 5.0, _floor_y + 4.4)
 	_floor_y += 4.0
 	_slab(-2.2, 2.2, lip - 12.0, lip + 0.5, _floor_y, _accent)
 	_solid_end = lip - 12.0
@@ -2216,21 +2267,24 @@ func _slope_span(x0: float, z0: float, y0: float, x1: float, z1: float, y1: floa
 func _boost_gap() -> void:
 	_hint("BOOST", Vector3(0, _floor_y + 2.4, _solid_end - 1.0))
 	var near := _solid_end
-	_deck(7.0, 2.4)
-	_boost_at(near - 2.6)
+	var half := maxf(4.2, _lane_half)
+	_deck(7.0, half)
+	var reach := maxf(1.15, half - 1.4)
+	var x0 := _pad_x(reach)
+	_boost_at(near - 2.6, x0, _floor_y, false, 2.05, 0.85)
 	var takeoff := _solid_end
 	_solid_end -= 5.2
 	travel += 5.2
 	_since_cp += 5.2
 	var lip := _solid_end
 	if _rng.randf() < 0.5:
-		_jump_ring(0.0, takeoff - 2.6, _floor_y + 1.15)
+		_jump_ring(x0 * 0.35, takeoff - 2.6, _floor_y + 3.2)
 	_landing()
 	# The shove holds 22 m/s for 0.62s, about 13.6m. This smaller pad sits
 	# just as that speed lets go, so a clean run chains into a second shove.
 	var fade_z := (near - 2.6) - 12.8
 	if fade_z < lip - 1.4 and fade_z > _solid_end + 2.0:
-		_boost_at(fade_z, 0.0, _floor_y, false, 1.8, 0.72)
+		_boost_at(fade_z, _pad_x(reach), _floor_y, false, 1.8, 0.72)
 	if _landing_len >= 10.0:
 		_back_pad(lip - 7.2, 2.7)
 
@@ -2250,10 +2304,19 @@ func _chain() -> void:
 	var step := 12.8
 	var pads := 5
 	var length := 5.0 + step * float(pads - 1) + 9.0
-	_deck(length, 3.2)
+	var half := maxf(4.4, _lane_half)
+	_deck(length, half)
+	var reach := maxf(1.3, half - 1.45)
 	for i in pads:
-		_boost_at(start - 4.0 - step * float(i), 0.0, _floor_y, false, 2.05, 0.8)
+		_boost_at(start - 4.0 - step * float(i), _pad_x(reach), _floor_y, false, 2.05, 0.8)
 	_landing()
+
+
+func _pad_x(reach: float) -> float:
+	var x := _rng.randf_range(-reach, reach)
+	if absf(x) < 0.9:
+		x = 0.9 if x >= 0.0 else -0.9
+	return x
 
 
 func _wall_pad(side: int, z: float, face_x: float, surface_y: float) -> void:
@@ -2329,7 +2392,8 @@ func _jump_ring(x: float, z: float, y: float) -> void:
 	area.position = Vector3(x, y, z)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.7, 1.7, 0.7)
+	box.size = Vector3(1.55, 1.7, 0.85)
+	shape.position = Vector3(0.0, -0.12, 0.0)
 	shape.shape = box
 	area.add_child(shape)
 	if _kit_on():
@@ -2547,8 +2611,7 @@ func _finish_line() -> void:
 	var z := _solid_end + 6.0
 	_finish_z = z
 	_finish_y = _floor_y
-	var apron := 0.952 * _GANTRY_SCALE + 0.4
-	_slab(-apron, apron, z - 1.6, z + 1.4, _floor_y, _concrete)
+	_slab(-8.4, 8.4, z - 12.0, z + 2.4, _floor_y, _concrete)
 	var area := Area3D.new()
 	area.set_script(load("res://scripts/finish_line.gd"))
 	# The near face meets the front of the arch, so the pass counts as you reach it.
@@ -2561,6 +2624,14 @@ func _finish_line() -> void:
 	area.add_child(shape)
 	add_child(area)
 	_with_scene(_GANTRY_PATH, _spawn_gantry)
+
+
+func finish_spot(index: int) -> Vector3:
+	var col := posmod(index, 5)
+	var row := int(index / 5)
+	var x := (float(col) - 2.0) * 1.55
+	var z := _finish_z - 3.6 - float(row) * 1.7
+	return Vector3(x, _finish_y, z)
 
 
 func _note_beacons(feet: Vector3) -> void:

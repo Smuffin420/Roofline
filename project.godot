@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Roofline"
-config/version="0.3.10"
+config/version="0.3.15"
 config/description="First-person parkour races. Ten roofs, a vote, trophies, and levels."
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.8", "GL Compatibility")
