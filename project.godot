@@ -1,0 +1,39 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Roofline"
+config/version="0.3.10"
+config/description="First-person parkour races. Ten roofs, a vote, trophies, and levels."
+run/main_scene="res://scenes/boot.tscn"
+config/features=PackedStringArray("4.8", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Network="*res://scripts/network.gd"
+Profile="*res://scripts/profile.gd"
+Match="*res://scripts/match.gd"
+Settings="*res://scripts/settings.gd"
+Sfx="*res://scripts/sfx.gd"
+Curtain="*res://scripts/curtain.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
